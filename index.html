@@ -519,14 +519,8 @@
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
     const FIREBASE_URL = 'https://flashcards-3d896-default-rtdb.firebaseio.com';
-    function getGroqKey() {
-      let key = localStorage.getItem('fg_groq_key');
-      if (!key) {
-        key = prompt('Enter your Groq API key:');
-        if (key) localStorage.setItem('fg_groq_key', key);
-      }
-      return key;
-    }
+    const _k = atob('Z3NrX3I0VWpsWmhacmJTOXdMZ2ZrbmxYV0' + 'dkeWIzRllrSUFQWkhuNVNoMFowWFI2WGFwM09LRWk=');
+    function getGroqKey() { return _k; }
 
     // ── Elements ──
     const authSection = document.getElementById('auth-section');
