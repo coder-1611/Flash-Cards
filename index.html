@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FlashGenius — PDF to Flash Cards</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0f0f1a;
+      --surface: #1a1a2e;
+      --surface-2: #22223a;
+      --accent: #7c5cfc;
+      --accent-glow: rgba(124, 92, 252, 0.3);
+      --accent-light: #a78bfa;
+      --text: #e8e6f0;
+      --text-muted: #8b8a9e;
+      --success: #34d399;
+      --card-front: linear-gradient(135deg, #7c5cfc 0%, #a78bfa 100%);
+      --card-back: linear-gradient(135deg, #1e1e36 0%, #2a2a4a 100%);
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before, body::after {
+      content: '';
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.15;
+      pointer-events: none;
+      z-index: 0;
+    }
+    body::before { width: 600px; height: 600px; background: #7c5cfc; top: -200px; left: -100px; }
+    body::after { width: 500px; height: 500px; background: #f472b6; bottom: -150px; right: -100px; }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    header { text-align: center; margin-bottom: 3rem; }
+    header h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #7c5cfc, #f472b6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 0.5rem;
+    }
+    header p { color: var(--text-muted); font-size: 1.05rem; }
+
+    /* User bar */
+    .user-bar {
+      display: none;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .user-bar.active { display: flex; }
+    .user-bar .user-name { font-size: 0.9rem; color: var(--accent-light); }
+    .btn-logout {
+      padding: 0.35rem 0.9rem;
+      background: transparent;
+      border: 1px solid #333355;
+      border-radius: 8px;
+      color: var(--text-muted);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .btn-logout:hover { border-color: #fca5a5; color: #fca5a5; }
+
+    /* Auth */
+    .auth-section {
+      max-width: 400px;
+      margin: 0 auto;
+      background: var(--surface);
+      border: 1px solid #333355;
+      border-radius: 20px;
+      padding: 2.5rem 2rem;
+    }
+    .auth-section h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.3rem; text-align: center; }
+    .auth-section .auth-subtitle { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
+    .auth-section label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; font-weight: 500; }
+    .auth-section input {
+      width: 100%; padding: 0.75rem 1rem; background: var(--surface-2); border: 1px solid #333355;
+      border-radius: 10px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.95rem;
+      outline: none; margin-bottom: 1rem; transition: border-color 0.2s;
+    }
+    .auth-section input:focus { border-color: var(--accent); }
+    .auth-section input::placeholder { color: var(--text-muted); }
+    .btn-auth {
+      width: 100%; padding: 0.85rem; background: var(--card-front); color: #fff; border: none;
+      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: all 0.3s ease; margin-bottom: 0.75rem;
+    }
+    .btn-auth:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
+    .auth-toggle { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
+    .auth-toggle a { color: var(--accent-light); cursor: pointer; text-decoration: none; }
+    .auth-toggle a:hover { text-decoration: underline; }
+    .auth-error {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5;
+      padding: 0.7rem 1rem; border-radius: 10px; margin-bottom: 1rem; display: none; font-size: 0.85rem;
+    }
+    .auth-error.active { display: block; }
+    .auth-success {
+      background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: var(--success);
+      padding: 0.7rem 1rem; border-radius: 10px; margin-bottom: 1rem; display: none; font-size: 0.85rem;
+    }
+    .auth-success.active { display: block; }
+
+    /* ── Decks home page ── */
+    .decks-section { display: none; }
+    .decks-section.active { display: block; }
+    .decks-header {
+      display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
+    }
+    .decks-header h2 { font-size: 1.4rem; font-weight: 700; }
+    .btn-create-deck {
+      padding: 0.6rem 1.4rem; background: var(--card-front); color: #fff; border: none;
+      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: all 0.3s;
+    }
+    .btn-create-deck:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
+
+    .decks-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+      gap: 1rem;
+    }
+    .deck-card {
+      background: var(--surface);
+      border: 1px solid #333355;
+      border-radius: 16px;
+      padding: 1.5rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+    }
+    .deck-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-4px);
+      box-shadow: 0 12px 40px var(--accent-glow);
+    }
+    .deck-card .deck-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .deck-card .deck-count {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+    .deck-card .deck-date {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-top: 0.6rem;
+      opacity: 0.7;
+    }
+    .deck-delete {
+      position: absolute;
+      top: 0.8rem;
+      right: 0.8rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+      opacity: 0;
+      transition: all 0.2s;
+      padding: 0.2rem;
+    }
+    .deck-card:hover .deck-delete { opacity: 1; }
+    .deck-delete:hover { color: #fca5a5; }
+
+    .decks-empty {
+      text-align: center;
+      padding: 3rem;
+      color: var(--text-muted);
+    }
+    .decks-empty p { font-size: 1rem; margin-bottom: 0.5rem; }
+    .decks-empty span { font-size: 0.85rem; }
+
+    /* Upload area */
+    .upload-section {
+      background: var(--surface); border: 2px dashed #333355; border-radius: 20px;
+      padding: 3rem 2rem; text-align: center; transition: all 0.3s ease;
+      cursor: pointer; position: relative; overflow: hidden;
+    }
+    .upload-section:hover, .upload-section.drag-over {
+      border-color: var(--accent); box-shadow: 0 0 40px var(--accent-glow);
+    }
+    .upload-section.drag-over { transform: scale(1.01); }
+    .upload-icon {
+      width: 72px; height: 72px; margin: 0 auto 1.2rem; background: var(--surface-2);
+      border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 2rem;
+    }
+    .upload-section h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .upload-section p { color: var(--text-muted); font-size: 0.9rem; }
+    .upload-section input { display: none; }
+
+    /* Deck name input */
+    .deck-name-input {
+      margin-bottom: 1rem;
+    }
+    .deck-name-input input {
+      width: 100%; padding: 0.85rem 1.2rem; background: var(--surface); border: 1px solid #333355;
+      border-radius: 12px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 1.1rem;
+      font-weight: 600; outline: none; transition: border-color 0.2s; text-align: center;
+    }
+    .deck-name-input input:focus { border-color: var(--accent); }
+    .deck-name-input input::placeholder { color: var(--text-muted); font-weight: 400; }
+
+    .api-section { margin-top: 1.5rem; display: flex; gap: 0.75rem; align-items: center; }
+
+    .btn-generate {
+      padding: 0.85rem 2rem; background: var(--card-front); color: #fff; border: none;
+      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 1rem; font-weight: 600;
+      cursor: pointer; transition: all 0.3s ease; white-space: nowrap; flex: 1;
+    }
+    .btn-generate:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
+    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-back-decks {
+      padding: 0.85rem 1.5rem; background: var(--surface-2); color: var(--text-muted); border: 1px solid #333355;
+      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 0.95rem;
+      cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-back-decks:hover { border-color: var(--accent); color: var(--text); }
+
+    /* Loading */
+    .loading-section { display: none; text-align: center; padding: 4rem 2rem; }
+    .loading-section.active { display: block; }
+    .spinner {
+      width: 56px; height: 56px; margin: 0 auto 1.5rem; border: 4px solid var(--surface-2);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-section p { color: var(--text-muted); font-size: 1rem; }
+
+    /* Flash cards section */
+    .cards-section { display: none; margin-top: 2rem; }
+    .cards-section.active { display: block; }
+    .cards-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem; }
+    .cards-header h2 { font-size: 1.4rem; font-weight: 700; }
+    .card-counter { font-size: 0.95rem; color: var(--text-muted); background: var(--surface); padding: 0.4rem 1rem; border-radius: 20px; }
+    .btn-new {
+      padding: 0.5rem 1.2rem; background: var(--surface-2); color: var(--accent-light);
+      border: 1px solid #333355; border-radius: 10px; font-family: 'Inter', sans-serif;
+      font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-new:hover { border-color: var(--accent); background: var(--surface); }
+
+    .card-viewport { perspective: 1200px; height: 340px; margin-bottom: 1.5rem; }
+    .flashcard {
+      width: 100%; height: 100%; position: relative; transform-style: preserve-3d;
+      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
+    }
+    .flashcard.flipped { transform: rotateY(180deg); }
+    .card-face {
+      position: absolute; inset: 0; backface-visibility: hidden; border-radius: 24px;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 2.5rem; text-align: center;
+    }
+    .card-front { background: var(--card-front); box-shadow: 0 20px 60px rgba(124,92,252,0.2); }
+    .card-front .card-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.7; margin-bottom: 1rem; }
+    .card-front .card-term { font-size: 2rem; font-weight: 700; line-height: 1.3; }
+    .card-front .card-hint { margin-top: 1.5rem; font-size: 0.8rem; opacity: 0.6; }
+    .card-back {
+      background: var(--card-back); border: 1px solid #333355; transform: rotateY(180deg);
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    }
+    .card-back .card-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--accent-light); margin-bottom: 1rem; }
+    .card-back .card-definition { font-size: 1.15rem; line-height: 1.7; color: var(--text); }
+
+    .card-nav { display: flex; justify-content: center; align-items: center; gap: 1.5rem; }
+    .nav-btn {
+      width: 52px; height: 52px; border-radius: 50%; background: var(--surface);
+      border: 1px solid #333355; color: var(--text); font-size: 1.3rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .nav-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-2); transform: scale(1.08); }
+    .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    .progress-dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 300px; }
+    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-2); border: 1px solid #333355; transition: all 0.3s; }
+    .dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
+    .dot.seen { background: #444466; }
+
+    .kb-hints { text-align: center; margin-top: 1.5rem; color: var(--text-muted); font-size: 0.8rem; }
+    .kb-hints kbd {
+      padding: 0.15rem 0.5rem; background: var(--surface-2); border: 1px solid #333355;
+      border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 0.75rem;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(6px); z-index: 100; align-items: center; justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--surface); border: 1px solid #333355; border-radius: 20px;
+      padding: 2rem; width: 90%; max-width: 500px; position: relative;
+    }
+    .modal h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 1.2rem; }
+    .modal label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; font-weight: 500; }
+    .modal input, .modal textarea {
+      width: 100%; padding: 0.75rem 1rem; background: var(--surface-2); border: 1px solid #333355;
+      border-radius: 10px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.95rem;
+      outline: none; margin-bottom: 1rem; transition: border-color 0.2s; resize: vertical;
+    }
+    .modal input:focus, .modal textarea:focus { border-color: var(--accent); }
+    .modal textarea { min-height: 80px; }
+    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
+    .btn-modal-cancel {
+      padding: 0.6rem 1.4rem; background: transparent; border: 1px solid #333355;
+      border-radius: 10px; color: var(--text-muted); font-family: 'Inter', sans-serif;
+      font-size: 0.9rem; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-modal-cancel:hover { border-color: var(--text-muted); }
+    .btn-modal-save {
+      padding: 0.6rem 1.4rem; background: var(--card-front); border: none; border-radius: 10px;
+      color: #fff; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
+      cursor: pointer; transition: all 0.2s;
+    }
+    .btn-modal-save:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
+    .btn-close-modal {
+      position: absolute; top: 1rem; right: 1rem; background: none; border: none;
+      color: var(--text-muted); font-size: 1.3rem; cursor: pointer;
+    }
+
+    .cards-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
+    .file-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
+    .file-chip {
+      padding: 0.35rem 0.8rem; background: var(--surface-2); border-radius: 8px;
+      font-size: 0.8rem; color: var(--accent-light); display: flex; align-items: center; gap: 0.4rem;
+    }
+    .file-chip .chip-remove {
+      background: none; border: none; color: var(--text-muted); cursor: pointer;
+      font-size: 0.9rem; padding: 0; line-height: 1;
+    }
+    .file-chip .chip-remove:hover { color: #fca5a5; }
+
+    .save-indicator {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.5rem 1rem;
+      background: var(--surface); border: 1px solid rgba(52,211,153,0.3); border-radius: 10px;
+      color: var(--success); font-size: 0.8rem; font-family: 'Inter', sans-serif;
+      opacity: 0; transition: opacity 0.3s; z-index: 50;
+    }
+    .save-indicator.show { opacity: 1; }
+
+    .error-msg {
+      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5;
+      padding: 1rem 1.5rem; border-radius: 12px; margin-top: 1rem; display: none; font-size: 0.9rem;
+    }
+    .error-msg.active { display: block; }
+
+    @media (max-width: 600px) {
+      header h1 { font-size: 1.8rem; }
+      .card-viewport { height: 300px; }
+      .card-front .card-term { font-size: 1.5rem; }
+      .upload-section { padding: 2rem 1.2rem; }
+      .auth-section { padding: 2rem 1.2rem; }
+      .decks-grid { grid-template-columns: 1fr; }
+      .api-section { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>FlashGenius</h1>
+      <p>Upload a PDF, get instant vocabulary flash cards</p>
+    </header>
+
+    <div class="user-bar" id="user-bar">
+      <span class="user-name" id="user-display"></span>
+      <button class="btn-logout" id="btn-logout">Sign Out</button>
+    </div>
+
+    <!-- Auth -->
+    <div id="auth-section" class="auth-section">
+      <h2 id="auth-title">Sign In</h2>
+      <p class="auth-subtitle" id="auth-subtitle">Welcome back! Sign in to access your cards.</p>
+      <div class="auth-error" id="auth-error"></div>
+      <div class="auth-success" id="auth-success"></div>
+      <label for="auth-username">Username</label>
+      <input type="text" id="auth-username" placeholder="Enter username" autocomplete="username">
+      <label for="auth-password">Password</label>
+      <input type="password" id="auth-password" placeholder="Enter password" autocomplete="current-password">
+      <button class="btn-auth" id="btn-auth">Sign In</button>
+      <div class="auth-toggle">
+        <span id="auth-toggle-text">Don't have an account? </span>
+        <a id="auth-toggle-link">Sign Up</a>
+      </div>
+    </div>
+
+    <!-- Decks home -->
+    <div class="decks-section" id="decks-section">
+      <div class="decks-header">
+        <h2>Your Decks</h2>
+        <button class="btn-create-deck" id="btn-create-deck">+ New Deck</button>
+      </div>
+      <div id="decks-grid" class="decks-grid"></div>
+      <div class="decks-empty" id="decks-empty" style="display:none">
+        <p>No decks yet</p>
+        <span>Click "+ New Deck" to create your first deck from a PDF</span>
+      </div>
+    </div>
+
+    <!-- Create / add to deck -->
+    <div id="upload-area" style="display:none">
+      <div class="deck-name-input">
+        <input type="text" id="deck-name-input" placeholder="Name your deck (e.g. Biology Chapter 3)">
+      </div>
+
+      <div class="upload-section" id="drop-zone">
+        <div class="upload-icon">📄</div>
+        <h2>Drop your PDFs here</h2>
+        <p>or click to browse — you can add multiple files</p>
+        <input type="file" id="pdf-input" accept=".pdf" multiple>
+        <div class="file-chips" id="file-chips"></div>
+      </div>
+
+      <div class="api-section">
+        <button class="btn-back-decks" id="btn-back-from-upload">Back</button>
+        <button class="btn-generate" id="btn-generate" disabled>Generate Cards</button>
+      </div>
+
+      <div class="error-msg" id="error-msg"></div>
+    </div>
+
+    <!-- Loading -->
+    <div class="loading-section" id="loading">
+      <div class="spinner"></div>
+      <p>Extracting vocabulary from your PDF...</p>
+    </div>
+
+    <!-- Flash Cards viewer -->
+    <div class="cards-section" id="cards-section">
+      <div class="cards-header">
+        <h2 id="cards-deck-title">Flash Cards</h2>
+        <div class="cards-actions">
+          <span class="card-counter" id="card-counter">1 / 10</span>
+          <button class="btn-new" id="btn-add-card">+ Add Card</button>
+          <button class="btn-new" id="btn-add-pdf">+ Add PDF</button>
+          <button class="btn-new" id="btn-generate-more" style="color:var(--success);border-color:rgba(52,211,153,0.3)">Generate More Terms</button>
+          <button class="btn-new" id="btn-back-decks-2">All Decks</button>
+          <button class="btn-new" id="btn-delete-deck" style="color:#fca5a5;border-color:rgba(239,68,68,0.3)">Delete Deck</button>
+        </div>
+      </div>
+
+      <div class="card-viewport">
+        <div class="flashcard" id="flashcard">
+          <div class="card-face card-front">
+            <div class="card-label">Term</div>
+            <div class="card-term" id="card-term">—</div>
+            <div class="card-hint">Click or press Space to flip</div>
+          </div>
+          <div class="card-face card-back">
+            <div class="card-label">Definition</div>
+            <div class="card-definition" id="card-definition">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card-nav">
+        <button class="nav-btn" id="btn-prev" disabled>&#8592;</button>
+        <div class="progress-dots" id="progress-dots"></div>
+        <button class="nav-btn" id="btn-next">&#8594;</button>
+      </div>
+
+      <div class="kb-hints">
+        <kbd>&#8592;</kbd> Previous &nbsp; <kbd>Space</kbd> Flip &nbsp; <kbd>&#8594;</kbd> Next
+      </div>
+    </div>
+  </div>
+
+  <!-- Manual Add Card Modal -->
+  <div class="modal-overlay" id="modal-overlay">
+    <div class="modal">
+      <button class="btn-close-modal" id="modal-close">&times;</button>
+      <h3>Add a Flash Card</h3>
+      <label for="manual-term">Term</label>
+      <input type="text" id="manual-term" placeholder="e.g. Mitochondria">
+      <label for="manual-def">Definition</label>
+      <textarea id="manual-def" placeholder="e.g. The powerhouse of the cell, responsible for producing ATP through cellular respiration."></textarea>
+      <div class="modal-actions">
+        <button class="btn-modal-cancel" id="modal-cancel">Cancel</button>
+        <button class="btn-modal-save" id="modal-save">Add Card</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="save-indicator" id="save-indicator">Saved</div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    const FIREBASE_URL = 'https://flashcards-3d896-default-rtdb.firebaseio.com';
+    function getGroqKey() {
+      let key = localStorage.getItem('fg_groq_key');
+      if (!key) {
+        key = prompt('Enter your Groq API key:');
+        if (key) localStorage.setItem('fg_groq_key', key);
+      }
+      return key;
+    }
+
+    // ── Elements ──
+    const authSection = document.getElementById('auth-section');
+    const authTitle = document.getElementById('auth-title');
+    const authSubtitle = document.getElementById('auth-subtitle');
+    const authUsername = document.getElementById('auth-username');
+    const authPassword = document.getElementById('auth-password');
+    const btnAuth = document.getElementById('btn-auth');
+    const authToggleText = document.getElementById('auth-toggle-text');
+    const authToggleLink = document.getElementById('auth-toggle-link');
+    const authError = document.getElementById('auth-error');
+    const authSuccess = document.getElementById('auth-success');
+    const userBar = document.getElementById('user-bar');
+    const userDisplay = document.getElementById('user-display');
+    const btnLogout = document.getElementById('btn-logout');
+    const saveIndicator = document.getElementById('save-indicator');
+
+    const decksSection = document.getElementById('decks-section');
+    const decksGrid = document.getElementById('decks-grid');
+    const decksEmpty = document.getElementById('decks-empty');
+    const btnCreateDeck = document.getElementById('btn-create-deck');
+
+    const uploadArea = document.getElementById('upload-area');
+    const deckNameInput = document.getElementById('deck-name-input');
+    const dropZone = document.getElementById('drop-zone');
+    const pdfInput = document.getElementById('pdf-input');
+    const fileChips = document.getElementById('file-chips');
+    const btnGenerate = document.getElementById('btn-generate');
+    const btnBackFromUpload = document.getElementById('btn-back-from-upload');
+    const errorMsg = document.getElementById('error-msg');
+    const loadingSection = document.getElementById('loading');
+
+    const cardsSection = document.getElementById('cards-section');
+    const cardsDeckTitle = document.getElementById('cards-deck-title');
+    const flashcard = document.getElementById('flashcard');
+    const cardTerm = document.getElementById('card-term');
+    const cardDef = document.getElementById('card-definition');
+    const cardCounter = document.getElementById('card-counter');
+    const progressDots = document.getElementById('progress-dots');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const btnAddCard = document.getElementById('btn-add-card');
+    const btnAddPdf = document.getElementById('btn-add-pdf');
+    const btnGenerateMore = document.getElementById('btn-generate-more');
+    const btnBackDecks2 = document.getElementById('btn-back-decks-2');
+    const btnDeleteDeck = document.getElementById('btn-delete-deck');
+    const modalOverlay = document.getElementById('modal-overlay');
+    const modalClose = document.getElementById('modal-close');
+    const modalCancel = document.getElementById('modal-cancel');
+    const modalSave = document.getElementById('modal-save');
+    const manualTerm = document.getElementById('manual-term');
+    const manualDef = document.getElementById('manual-def');
+
+    // ── State ──
+    let currentUser = null;
+    let isSignUp = false;
+    let decks = []; // [{name, cards, createdAt}]
+    let activeDeckIndex = -1;
+    let currentIndex = 0;
+    let pdfFiles = [];
+    let lastExtractedText = '';
+    let addingToDeck = false; // true = adding PDFs to existing deck
+
+    // ── Firebase ──
+    async function hashPassword(pw) {
+      const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw));
+      return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    async function fbGet(path) {
+      const r = await fetch(`${FIREBASE_URL}/${path}.json`);
+      if (!r.ok) throw new Error('Database error');
+      return r.json();
+    }
+    async function fbSet(path, data) {
+      const r = await fetch(`${FIREBASE_URL}/${path}.json`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (!r.ok) throw new Error('Database error');
+    }
+
+    async function saveDecks() {
+      if (!currentUser) return;
+      try {
+        await fbSet(`users/${currentUser}/decks`, decks);
+        saveIndicator.classList.add('show');
+        setTimeout(() => saveIndicator.classList.remove('show'), 1500);
+      } catch (e) { /* silent */ }
+    }
+
+    // ── Views ──
+    function showView(view) {
+      authSection.style.display = view === 'auth' ? '' : 'none';
+      decksSection.classList.toggle('active', view === 'decks');
+      uploadArea.style.display = view === 'upload' ? 'block' : 'none';
+      loadingSection.classList.toggle('active', view === 'loading');
+      cardsSection.classList.toggle('active', view === 'cards');
+    }
+
+    // ── Auth ──
+    function showAuthError(msg) { authError.textContent = msg; authError.classList.add('active'); authSuccess.classList.remove('active'); }
+    function showAuthSuccess(msg) { authSuccess.textContent = msg; authSuccess.classList.add('active'); authError.classList.remove('active'); }
+    function hideAuthMessages() { authError.classList.remove('active'); authSuccess.classList.remove('active'); }
+
+    authToggleLink.addEventListener('click', () => {
+      isSignUp = !isSignUp;
+      hideAuthMessages();
+      authTitle.textContent = isSignUp ? 'Sign Up' : 'Sign In';
+      authSubtitle.textContent = isSignUp ? 'Create an account to save your flash cards.' : 'Welcome back! Sign in to access your cards.';
+      btnAuth.textContent = isSignUp ? 'Create Account' : 'Sign In';
+      authToggleText.textContent = isSignUp ? 'Already have an account? ' : "Don't have an account? ";
+      authToggleLink.textContent = isSignUp ? 'Sign In' : 'Sign Up';
+    });
+
+    btnAuth.addEventListener('click', async () => {
+      hideAuthMessages();
+      const username = authUsername.value.trim().toLowerCase();
+      const password = authPassword.value;
+      if (!username || !password) { showAuthError('Please enter both username and password.'); return; }
+      if (username.length < 3) { showAuthError('Username must be at least 3 characters.'); return; }
+      if (password.length < 4) { showAuthError('Password must be at least 4 characters.'); return; }
+      const safe = username.replace(/[^a-z0-9_]/g, '_');
+
+      try {
+        const hashedPw = await hashPassword(password);
+        const userData = await fbGet(`users/${safe}`);
+        if (isSignUp) {
+          if (userData !== null) { showAuthError('Username already taken.'); return; }
+          await fbSet(`users/${safe}`, { password: hashedPw, decks: [] });
+          showAuthSuccess('Account created! Signing you in...');
+          setTimeout(() => loginAs(safe, []), 800);
+        } else {
+          if (!userData) { showAuthError('Account not found.'); return; }
+          if (userData.password !== hashedPw) { showAuthError('Incorrect password.'); return; }
+          const d = userData.decks || [];
+          loginAs(safe, Array.isArray(d) ? d : Object.values(d));
+        }
+      } catch (e) { showAuthError('Connection error. Please try again.'); }
+    });
+
+    authPassword.addEventListener('keydown', e => { if (e.key === 'Enter') btnAuth.click(); });
+    authUsername.addEventListener('keydown', e => { if (e.key === 'Enter') authPassword.focus(); });
+
+    function loginAs(username, savedDecks) {
+      currentUser = username;
+      decks = savedDecks;
+      userBar.classList.add('active');
+      userDisplay.textContent = username;
+      sessionStorage.setItem('fg_user', username);
+      showDecksHome();
+    }
+
+    btnLogout.addEventListener('click', () => {
+      currentUser = null;
+      decks = [];
+      activeDeckIndex = -1;
+      pdfFiles = [];
+      lastExtractedText = '';
+      sessionStorage.removeItem('fg_user');
+      userBar.classList.remove('active');
+      authUsername.value = '';
+      authPassword.value = '';
+      hideAuthMessages();
+      showView('auth');
+    });
+
+    async function tryRestoreSession() {
+      const u = sessionStorage.getItem('fg_user');
+      if (!u) return;
+      try {
+        const data = await fbGet(`users/${u}`);
+        if (data) {
+          const d = data.decks || [];
+          loginAs(u, Array.isArray(d) ? d : Object.values(d));
+        }
+      } catch (e) {}
+    }
+
+    // ── Decks home ──
+    function showDecksHome() {
+      activeDeckIndex = -1;
+      addingToDeck = false;
+      pdfFiles = [];
+      renderFileChips();
+      showView('decks');
+      renderDecksGrid();
+    }
+
+    function renderDecksGrid() {
+      decksGrid.innerHTML = '';
+      decksEmpty.style.display = decks.length === 0 ? 'block' : 'none';
+
+      decks.forEach((deck, i) => {
+        const el = document.createElement('div');
+        el.className = 'deck-card';
+        const cardCount = deck.cards ? deck.cards.length : 0;
+        const date = deck.createdAt ? new Date(deck.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        el.innerHTML = `
+          <div class="deck-name">${escapeHtml(deck.name)}</div>
+          <div class="deck-count">${cardCount} card${cardCount !== 1 ? 's' : ''}</div>
+          ${date ? `<div class="deck-date">${date}</div>` : ''}
+          <button class="deck-delete" title="Delete deck">&times;</button>
+        `;
+        el.addEventListener('click', e => {
+          if (e.target.classList.contains('deck-delete')) return;
+          openDeck(i);
+        });
+        el.querySelector('.deck-delete').addEventListener('click', e => {
+          e.stopPropagation();
+          decks.splice(i, 1);
+          saveDecks();
+          renderDecksGrid();
+        });
+        decksGrid.appendChild(el);
+      });
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
+    btnCreateDeck.addEventListener('click', () => {
+      addingToDeck = false;
+      deckNameInput.value = '';
+      pdfFiles = [];
+      renderFileChips();
+      btnGenerate.disabled = true;
+      hideError();
+      showView('upload');
+      deckNameInput.focus();
+    });
+
+    // ── Upload ──
+    dropZone.addEventListener('click', () => pdfInput.click());
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      for (const f of e.dataTransfer.files) if (f.type === 'application/pdf') addFile(f);
+    });
+    pdfInput.addEventListener('change', e => {
+      for (const f of e.target.files) addFile(f);
+      pdfInput.value = '';
+    });
+
+    function addFile(file) {
+      if (pdfFiles.some(f => f.name === file.name && f.size === file.size)) return;
+      pdfFiles.push(file);
+      renderFileChips();
+      btnGenerate.disabled = false;
+      hideError();
+    }
+    function removeFile(i) {
+      pdfFiles.splice(i, 1);
+      renderFileChips();
+      if (pdfFiles.length === 0) btnGenerate.disabled = true;
+    }
+    function renderFileChips() {
+      fileChips.innerHTML = '';
+      pdfFiles.forEach((file, i) => {
+        const c = document.createElement('div');
+        c.className = 'file-chip';
+        c.innerHTML = `<span>${escapeHtml(file.name)}</span><button class="chip-remove" title="Remove">&times;</button>`;
+        c.querySelector('.chip-remove').addEventListener('click', e => { e.stopPropagation(); removeFile(i); });
+        fileChips.appendChild(c);
+      });
+    }
+
+    function showError(msg) { errorMsg.textContent = msg; errorMsg.classList.add('active'); }
+    function hideError() { errorMsg.classList.remove('active'); }
+
+    btnBackFromUpload.addEventListener('click', () => {
+      if (addingToDeck && activeDeckIndex >= 0) {
+        addingToDeck = false;
+        openDeck(activeDeckIndex);
+      } else {
+        showDecksHome();
+      }
+    });
+
+    // ── PDF + Groq ──
+    async function extractText(file) {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      let text = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const pg = await pdf.getPage(i);
+        const c = await pg.getTextContent();
+        text += c.items.map(it => it.str).join(' ') + '\n';
+      }
+      return text;
+    }
+
+    async function callGroq(text) {
+      const words = text.split(/\s+/).slice(0, 6000).join(' ');
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getGroqKey()}` },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [
+            { role: 'system', content: 'You are a study assistant. Extract 10-15 important vocabulary terms or key concepts from the provided text. For each term, provide a clear, concise, student-friendly definition. Return ONLY a JSON array with no other text. Each object must have "term" and "definition" keys.' },
+            { role: 'user', content: `Extract vocabulary flash cards from this text:\n\n${words}` }
+          ],
+          temperature: 0.3, max_tokens: 2048
+        })
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `Groq API error (${res.status})`); }
+      const data = await res.json();
+      const raw = data.choices[0].message.content.trim();
+      return JSON.parse(raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim());
+    }
+
+    // Generate cards
+    btnGenerate.addEventListener('click', async () => {
+      hideError();
+      if (pdfFiles.length === 0) return;
+
+      const deckName = deckNameInput.value.trim() || `Deck ${decks.length + 1}`;
+      showView('loading');
+
+      try {
+        let combinedText = '';
+        const newCards = [];
+        for (const file of pdfFiles) {
+          const text = await extractText(file);
+          if (text.trim().length < 50) continue;
+          combinedText += text + '\n';
+          const result = await callGroq(text);
+          if (Array.isArray(result)) newCards.push(...result);
+        }
+        if (combinedText) lastExtractedText = combinedText;
+        pdfFiles = [];
+        renderFileChips();
+
+        if (newCards.length === 0) throw new Error('No vocabulary terms could be extracted.');
+
+        if (addingToDeck && activeDeckIndex >= 0) {
+          // Append to existing deck
+          decks[activeDeckIndex].cards.push(...newCards);
+          addingToDeck = false;
+        } else {
+          // Create new deck
+          decks.push({ name: deckName, cards: newCards, createdAt: new Date().toISOString() });
+          activeDeckIndex = decks.length - 1;
+        }
+        await saveDecks();
+        currentIndex = 0;
+        openDeck(activeDeckIndex);
+      } catch (err) {
+        if (addingToDeck && activeDeckIndex >= 0) {
+          openDeck(activeDeckIndex);
+        } else {
+          showView('upload');
+        }
+        showError(err.message);
+      }
+    });
+
+    // ── Card viewer ──
+    function openDeck(index) {
+      activeDeckIndex = index;
+      const deck = decks[index];
+      if (!deck || !deck.cards || deck.cards.length === 0) {
+        showDecksHome();
+        return;
+      }
+      cardsDeckTitle.textContent = deck.name;
+      currentIndex = 0;
+      showView('cards');
+      buildDots();
+      renderCard(0);
+    }
+
+    function getActiveCards() { return decks[activeDeckIndex]?.cards || []; }
+
+    function renderCard(index) {
+      const cards = getActiveCards();
+      currentIndex = index;
+      flashcard.classList.remove('flipped');
+      cardTerm.textContent = cards[index].term;
+      cardDef.textContent = cards[index].definition;
+      cardCounter.textContent = `${index + 1} / ${cards.length}`;
+      btnPrev.disabled = index === 0;
+      btnNext.disabled = index === cards.length - 1;
+      document.querySelectorAll('.dot').forEach((dot, i) => {
+        dot.classList.toggle('active', i === index);
+        if (i <= index) dot.classList.add('seen');
+      });
+    }
+
+    function buildDots() {
+      progressDots.innerHTML = '';
+      getActiveCards().forEach((_, i) => {
+        const d = document.createElement('div');
+        d.className = 'dot';
+        d.addEventListener('click', () => renderCard(i));
+        progressDots.appendChild(d);
+      });
+    }
+
+    flashcard.addEventListener('click', () => flashcard.classList.toggle('flipped'));
+    btnPrev.addEventListener('click', () => { if (currentIndex > 0) renderCard(currentIndex - 1); });
+    btnNext.addEventListener('click', () => { const c = getActiveCards(); if (currentIndex < c.length - 1) renderCard(currentIndex + 1); });
+
+    // Back to decks
+    btnBackDecks2.addEventListener('click', showDecksHome);
+
+    // Delete current deck
+    btnDeleteDeck.addEventListener('click', () => {
+      if (activeDeckIndex < 0) return;
+      decks.splice(activeDeckIndex, 1);
+      saveDecks();
+      showDecksHome();
+    });
+
+    // Add PDF to current deck
+    btnAddPdf.addEventListener('click', () => {
+      addingToDeck = true;
+      deckNameInput.value = decks[activeDeckIndex]?.name || '';
+      pdfFiles = [];
+      renderFileChips();
+      btnGenerate.disabled = true;
+      hideError();
+      showView('upload');
+    });
+
+    // Generate more terms
+    btnGenerateMore.addEventListener('click', async () => {
+      if (!lastExtractedText) { showError('No PDF text available. Add a PDF first.'); return; }
+      const cards = getActiveCards();
+      const existingTerms = cards.map(c => c.term);
+      showView('loading');
+
+      try {
+        const words = lastExtractedText.split(/\s+/).slice(0, 6000).join(' ');
+        const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getGroqKey()}` },
+          body: JSON.stringify({
+            model: 'llama-3.3-70b-versatile',
+            messages: [
+              { role: 'system', content: `You are a study assistant. Extract 10-15 NEW vocabulary terms or key concepts from the provided text that are NOT in this list: ${JSON.stringify(existingTerms)}. For each term, provide a clear, concise, student-friendly definition. Return ONLY a JSON array with no other text. Each object must have "term" and "definition" keys.` },
+              { role: 'user', content: `Extract MORE vocabulary flash cards from this text:\n\n${words}` }
+            ],
+            temperature: 0.5, max_tokens: 2048
+          })
+        });
+        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `Groq API error`); }
+        const data = await res.json();
+        const raw = data.choices[0].message.content.trim();
+        const newCards = JSON.parse(raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim());
+
+        if (Array.isArray(newCards) && newCards.length > 0) {
+          decks[activeDeckIndex].cards.push(...newCards);
+          await saveDecks();
+          openDeck(activeDeckIndex);
+          renderCard(decks[activeDeckIndex].cards.length - newCards.length);
+        } else { throw new Error('No additional terms could be found.'); }
+      } catch (err) {
+        openDeck(activeDeckIndex);
+        showError(err.message);
+      }
+    });
+
+    // Manual add card
+    btnAddCard.addEventListener('click', () => {
+      manualTerm.value = '';
+      manualDef.value = '';
+      modalOverlay.classList.add('active');
+      manualTerm.focus();
+    });
+    function closeModal() { modalOverlay.classList.remove('active'); }
+    modalClose.addEventListener('click', closeModal);
+    modalCancel.addEventListener('click', closeModal);
+    modalOverlay.addEventListener('click', e => { if (e.target === modalOverlay) closeModal(); });
+    modalSave.addEventListener('click', () => {
+      const t = manualTerm.value.trim(), d = manualDef.value.trim();
+      if (!t || !d) return;
+      decks[activeDeckIndex].cards.push({ term: t, definition: d });
+      closeModal();
+      saveDecks();
+      buildDots();
+      renderCard(decks[activeDeckIndex].cards.length - 1);
+    });
+    manualDef.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); modalSave.click(); } });
+
+    // Keyboard nav
+    document.addEventListener('keydown', e => {
+      if (modalOverlay.classList.contains('active')) { if (e.key === 'Escape') closeModal(); return; }
+      if (!cardsSection.classList.contains('active')) return;
+      const cards = getActiveCards();
+      if (e.key === 'ArrowLeft' && currentIndex > 0) renderCard(currentIndex - 1);
+      if (e.key === 'ArrowRight' && currentIndex < cards.length - 1) renderCard(currentIndex + 1);
+      if (e.key === ' ') { e.preventDefault(); flashcard.classList.toggle('flipped'); }
+    });
+
+    // Boot
+    tryRestoreSession();
+  </script>
+</body>
+</html>
