@@ -863,8 +863,10 @@
         if (newCards.length === 0) throw new Error('No vocabulary terms could be extracted.');
 
         if (addingToDeck && activeDeckIndex >= 0) {
-          // Append to existing deck
-          decks[activeDeckIndex].cards.push(...newCards);
+          // Append to existing deck, filtering duplicates
+          const existLower = decks[activeDeckIndex].cards.map(c => c.term.toLowerCase());
+          const unique = newCards.filter(c => !existLower.includes(c.term.toLowerCase()));
+          decks[activeDeckIndex].cards.push(...unique);
           decks[activeDeckIndex].sourceText = (decks[activeDeckIndex].sourceText || '') + combinedText;
           addingToDeck = false;
         } else {
@@ -998,8 +1000,14 @@
         }
 
         if (Array.isArray(newCards) && newCards.length > 0) {
+          // Filter out duplicates (case-insensitive match against existing terms)
+          const existingLower = existingTerms.map(t => t.toLowerCase());
+          const unique = newCards.filter(c => !existingLower.includes(c.term.toLowerCase()));
+          if (unique.length === 0) {
+            throw new Error('All generated terms already exist in this deck.');
+          }
           const jumpTo = decks[savedDeckIndex].cards.length;
-          decks[savedDeckIndex].cards.push(...newCards);
+          decks[savedDeckIndex].cards.push(...unique);
           await saveDecks();
           openDeck(savedDeckIndex);
           renderCard(jumpTo);
