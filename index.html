@@ -864,10 +864,11 @@
         if (addingToDeck && activeDeckIndex >= 0) {
           // Append to existing deck
           decks[activeDeckIndex].cards.push(...newCards);
+          decks[activeDeckIndex].sourceText = (decks[activeDeckIndex].sourceText || '') + combinedText;
           addingToDeck = false;
         } else {
           // Create new deck
-          decks.push({ name: deckName, cards: newCards, createdAt: new Date().toISOString() });
+          decks.push({ name: deckName, cards: newCards, createdAt: new Date().toISOString(), sourceText: combinedText });
           activeDeckIndex = decks.length - 1;
         }
         await saveDecks();
@@ -892,6 +893,7 @@
         return;
       }
       cardsDeckTitle.textContent = deck.name;
+      lastExtractedText = deck.sourceText || '';
       currentIndex = 0;
       showView('cards');
       buildDots();
