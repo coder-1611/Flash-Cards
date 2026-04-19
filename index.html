@@ -825,10 +825,10 @@
         body: JSON.stringify({
           model: 'llama-3.3-70b-versatile',
           messages: [
-            { role: 'system', content: 'You are a study assistant. Extract 10-15 important vocabulary terms or key concepts from the provided text. For each term, provide a clear, concise, student-friendly definition. Return ONLY a JSON array with no other text. Each object must have "term" and "definition" keys.' },
+            { role: 'system', content: 'You are a study assistant. Extract ALL important vocabulary terms and key concepts from the provided text. For each term, provide a clear, concise, student-friendly definition. Return ONLY a JSON array with no other text. Each object must have "term" and "definition" keys.' },
             { role: 'user', content: `Extract vocabulary flash cards from this text:\n\n${words}` }
           ],
-          temperature: 0.3, max_tokens: 2048
+          temperature: 0.3, max_tokens: 4096
         })
       });
       if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `Groq API error (${res.status})`); }
@@ -958,6 +958,7 @@
       if (!lastExtractedText) { showError('No PDF text available. Add a PDF first.'); return; }
       const cards = getActiveCards();
       const existingTerms = cards.map(c => c.term);
+      const savedDeckIndex = activeDeckIndex;
       showView('loading');
 
       try {
@@ -968,10 +969,10 @@
           body: JSON.stringify({
             model: 'llama-3.3-70b-versatile',
             messages: [
-              { role: 'system', content: `You are a study assistant. Extract 10-15 NEW vocabulary terms or key concepts from the provided text that are NOT in this list: ${JSON.stringify(existingTerms)}. For each term, provide a clear, concise, student-friendly definition. Return ONLY a JSON array with no other text. Each object must have "term" and "definition" keys.` },
+              { role: 'system', content: `You are a study assistant. Extract ALL additional vocabulary terms and key concepts from the provided text that are NOT already in this list: ${JSON.stringify(existingTerms)}. Focus on terms you missed before — secondary concepts, supporting vocabulary, and related terminology. For each term, provide a clear, concise, student-friendly definition. Return ONLY a JSON array with no other text. Each object must have "term" and "definition" keys.` },
               { role: 'user', content: `Extract MORE vocabulary flash cards from this text:\n\n${words}` }
             ],
-            temperature: 0.5, max_tokens: 2048
+            temperature: 0.6, max_tokens: 4096
           })
         });
         if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `Groq API error`); }
@@ -980,13 +981,14 @@
         const newCards = JSON.parse(raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim());
 
         if (Array.isArray(newCards) && newCards.length > 0) {
-          decks[activeDeckIndex].cards.push(...newCards);
+          const jumpTo = decks[savedDeckIndex].cards.length;
+          decks[savedDeckIndex].cards.push(...newCards);
           await saveDecks();
-          openDeck(activeDeckIndex);
-          renderCard(decks[activeDeckIndex].cards.length - newCards.length);
+          openDeck(savedDeckIndex);
+          renderCard(jumpTo);
         } else { throw new Error('No additional terms could be found.'); }
       } catch (err) {
-        openDeck(activeDeckIndex);
+        openDeck(savedDeckIndex);
         showError(err.message);
       }
     });
