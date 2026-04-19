@@ -731,6 +731,7 @@
         });
         el.querySelector('.deck-delete').addEventListener('click', e => {
           e.stopPropagation();
+          if (!confirm(`Delete "${deck.name}"? This cannot be undone.`)) return;
           decks.splice(i, 1);
           saveDecks();
           renderDecksGrid();
@@ -940,6 +941,7 @@
     // Delete current deck
     btnDeleteDeck.addEventListener('click', () => {
       if (activeDeckIndex < 0) return;
+      if (!confirm(`Delete "${decks[activeDeckIndex].name}"? This cannot be undone.`)) return;
       decks.splice(activeDeckIndex, 1);
       saveDecks();
       showDecksHome();
