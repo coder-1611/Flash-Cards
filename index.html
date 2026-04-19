@@ -514,6 +514,7 @@
   </div>
 
   <div class="save-indicator" id="save-indicator">Saved</div>
+  <div class="save-indicator" id="error-toast" style="border-color:rgba(239,68,68,0.3);color:#fca5a5;left:1.5rem;right:auto;max-width:400px;white-space:normal"></div>
 
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -953,9 +954,17 @@
       showView('upload');
     });
 
+    // Global error toast (visible from any view)
+    const errorToast = document.getElementById('error-toast');
+    function showToast(msg) {
+      errorToast.textContent = msg;
+      errorToast.classList.add('show');
+      setTimeout(() => errorToast.classList.remove('show'), 5000);
+    }
+
     // Generate more terms
     btnGenerateMore.addEventListener('click', async () => {
-      if (!lastExtractedText) { showError('No PDF text available. Add a PDF first.'); return; }
+      if (!lastExtractedText) { showToast('No PDF text available. Add a PDF first.'); return; }
       const cards = getActiveCards();
       const existingTerms = cards.map(c => c.term);
       const savedDeckIndex = activeDeckIndex;
@@ -975,10 +984,18 @@
             temperature: 0.6, max_tokens: 4096
           })
         });
-        if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error?.message || `Groq API error`); }
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(e.error?.message || `Groq API error (${res.status})`);
+        }
         const data = await res.json();
         const raw = data.choices[0].message.content.trim();
-        const newCards = JSON.parse(raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim());
+        let newCards;
+        try {
+          newCards = JSON.parse(raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim());
+        } catch (parseErr) {
+          throw new Error('Failed to parse response from Groq. Raw: ' + raw.substring(0, 200));
+        }
 
         if (Array.isArray(newCards) && newCards.length > 0) {
           const jumpTo = decks[savedDeckIndex].cards.length;
@@ -986,10 +1003,12 @@
           await saveDecks();
           openDeck(savedDeckIndex);
           renderCard(jumpTo);
-        } else { throw new Error('No additional terms could be found.'); }
+        } else {
+          throw new Error('No additional terms could be found in the text.');
+        }
       } catch (err) {
         openDeck(savedDeckIndex);
-        showError(err.message);
+        showToast(err.message);
       }
     });
 
