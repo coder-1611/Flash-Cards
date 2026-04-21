@@ -3,25 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>FlashGenius — PDF to Flash Cards</title>
+  <title>FlashGenius — AI Flash Cards</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap');
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
     :root {
-      --bg: #0f0f1a;
-      --surface: #1a1a2e;
-      --surface-2: #22223a;
+      --bg: #070711;
+      --surface: #0f0f1c;
+      --surface-2: #171726;
+      --surface-3: #1f1f34;
+      --border: rgba(255,255,255,0.07);
       --accent: #7c5cfc;
-      --accent-glow: rgba(124, 92, 252, 0.3);
-      --accent-light: #a78bfa;
-      --text: #e8e6f0;
-      --text-muted: #8b8a9e;
-      --success: #34d399;
-      --card-front: linear-gradient(135deg, #7c5cfc 0%, #a78bfa 100%);
-      --card-back: linear-gradient(135deg, #1e1e36 0%, #2a2a4a 100%);
+      --accent-2: #a78bfa;
+      --accent-glow: rgba(124,92,252,0.22);
+      --pink: #f472b6;
+      --text: #ece9ff;
+      --text-2: #8f8aaa;
+      --text-3: #454360;
+      --success: #4ade80;
+      --error: #f87171;
     }
 
     body {
@@ -32,400 +35,416 @@
       overflow-x: hidden;
     }
 
-    body::before, body::after {
-      content: '';
-      position: fixed;
-      border-radius: 50%;
-      filter: blur(120px);
-      opacity: 0.15;
-      pointer-events: none;
-      z-index: 0;
-    }
-    body::before { width: 600px; height: 600px; background: #7c5cfc; top: -200px; left: -100px; }
-    body::after { width: 500px; height: 500px; background: #f472b6; bottom: -150px; right: -100px; }
+    /* Background orbs */
+    .bg-orbs { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+    .orb { position: absolute; border-radius: 50%; filter: blur(90px); }
+    .orb-1 { width: 680px; height: 680px; background: var(--accent); top: -240px; left: -200px; opacity: 0.12; }
+    .orb-2 { width: 520px; height: 520px; background: var(--pink); bottom: -200px; right: -150px; opacity: 0.11; }
+    .orb-3 { width: 300px; height: 300px; background: #22d3ee; top: 42%; left: 58%; opacity: 0.06; }
 
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 2rem 1.5rem;
-      position: relative;
-      z-index: 1;
-    }
+    .container { max-width: 940px; margin: 0 auto; padding: 2.5rem 1.5rem 4rem; position: relative; z-index: 1; }
 
-    header { text-align: center; margin-bottom: 3rem; }
-    header h1 {
-      font-size: 2.5rem;
-      font-weight: 800;
-      background: linear-gradient(135deg, #7c5cfc, #f472b6);
-      -webkit-background-clip: text;
-      background-clip: text;
-      -webkit-text-fill-color: transparent;
-      margin-bottom: 0.5rem;
-    }
-    header p { color: var(--text-muted); font-size: 1.05rem; }
-
-    /* User bar */
-    .user-bar {
-      display: none;
-      justify-content: flex-end;
-      align-items: center;
-      gap: 0.75rem;
+    /* ── Header ── */
+    header { text-align: center; margin-bottom: 2.5rem; }
+    .brand-pill {
+      display: inline-flex; align-items: center; gap: 0.6rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 16px; padding: 0.5rem 1.2rem 0.5rem 0.65rem;
       margin-bottom: 1rem;
     }
-    .user-bar.active { display: flex; }
-    .user-bar .user-name { font-size: 0.9rem; color: var(--accent-light); }
-    .btn-logout {
-      padding: 0.35rem 0.9rem;
-      background: transparent;
-      border: 1px solid #333355;
-      border-radius: 8px;
-      color: var(--text-muted);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.8rem;
-      cursor: pointer;
-      transition: all 0.2s;
+    .brand-ico {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), var(--pink));
+      border-radius: 10px; display: flex; align-items: center; justify-content: center;
+      font-size: 1rem; box-shadow: 0 4px 16px var(--accent-glow);
     }
-    .btn-logout:hover { border-color: #fca5a5; color: #fca5a5; }
+    .brand-text {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 1.3rem; font-weight: 800;
+      background: linear-gradient(135deg, #c4b5fd, #f9a8d4);
+      -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    header p { color: var(--text-2); font-size: 0.9rem; }
 
-    /* Auth */
-    .auth-section {
-      max-width: 400px;
-      margin: 0 auto;
-      background: var(--surface);
-      border: 1px solid #333355;
-      border-radius: 20px;
-      padding: 2.5rem 2rem;
+    /* ── User bar ── */
+    .user-bar {
+      display: none; align-items: center; gap: 0.65rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 0.55rem 0.85rem; margin-bottom: 1.5rem;
     }
-    .auth-section h2 { font-size: 1.4rem; font-weight: 700; margin-bottom: 0.3rem; text-align: center; }
-    .auth-section .auth-subtitle { text-align: center; color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; }
-    .auth-section label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; font-weight: 500; }
-    .auth-section input {
-      width: 100%; padding: 0.75rem 1rem; background: var(--surface-2); border: 1px solid #333355;
-      border-radius: 10px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.95rem;
-      outline: none; margin-bottom: 1rem; transition: border-color 0.2s;
+    .user-bar.active { display: flex; }
+    .user-avatar {
+      width: 30px; height: 30px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--pink));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.78rem; font-weight: 800; color: #fff; text-transform: uppercase;
+      flex-shrink: 0;
     }
-    .auth-section input:focus { border-color: var(--accent); }
-    .auth-section input::placeholder { color: var(--text-muted); }
-    .btn-auth {
-      width: 100%; padding: 0.85rem; background: var(--card-front); color: #fff; border: none;
-      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 1rem; font-weight: 600;
-      cursor: pointer; transition: all 0.3s ease; margin-bottom: 0.75rem;
+    .user-bar .user-name { font-size: 0.875rem; color: var(--text-2); flex: 1; font-weight: 500; }
+    .btn-logout {
+      padding: 0.3rem 0.85rem; background: transparent;
+      border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text-3); font-family: 'Inter', sans-serif; font-size: 0.78rem;
+      cursor: pointer; transition: all 0.2s;
     }
-    .btn-auth:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
-    .auth-toggle { text-align: center; font-size: 0.85rem; color: var(--text-muted); }
-    .auth-toggle a { color: var(--accent-light); cursor: pointer; text-decoration: none; }
-    .auth-toggle a:hover { text-decoration: underline; }
+    .btn-logout:hover { border-color: var(--error); color: var(--error); }
+
+    /* ── Auth ── */
+    .auth-section { max-width: 420px; margin: 0 auto; }
+    .auth-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 24px; padding: 2.75rem 2.5rem;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.45);
+      animation: fadeUp 0.4s ease;
+    }
+    .auth-icon {
+      width: 56px; height: 56px;
+      background: linear-gradient(135deg, var(--accent), var(--pink));
+      border-radius: 16px; display: flex; align-items: center; justify-content: center;
+      font-size: 1.6rem; margin: 0 auto 1.25rem;
+      box-shadow: 0 8px 28px var(--accent-glow);
+    }
+    .auth-section h2 {
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.6rem; font-weight: 800;
+      text-align: center; margin-bottom: 0.3rem;
+    }
+    .auth-subtitle { text-align: center; color: var(--text-2); font-size: 0.875rem; margin-bottom: 2rem; }
     .auth-error {
-      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5;
-      padding: 0.7rem 1rem; border-radius: 10px; margin-bottom: 1rem; display: none; font-size: 0.85rem;
+      background: rgba(248,113,113,0.1); border: 1px solid rgba(248,113,113,0.2);
+      color: var(--error); padding: 0.7rem 1rem; border-radius: 10px;
+      margin-bottom: 1rem; display: none; font-size: 0.85rem;
     }
     .auth-error.active { display: block; }
     .auth-success {
-      background: rgba(52,211,153,0.1); border: 1px solid rgba(52,211,153,0.3); color: var(--success);
-      padding: 0.7rem 1rem; border-radius: 10px; margin-bottom: 1rem; display: none; font-size: 0.85rem;
+      background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.2);
+      color: var(--success); padding: 0.7rem 1rem; border-radius: 10px;
+      margin-bottom: 1rem; display: none; font-size: 0.85rem;
     }
     .auth-success.active { display: block; }
+    .auth-section label {
+      display: block; font-size: 0.775rem; font-weight: 600; color: var(--text-2);
+      margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.6px;
+    }
+    .auth-section input {
+      width: 100%; padding: 0.82rem 1rem;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 12px; color: var(--text); font-family: 'Inter', sans-serif;
+      font-size: 0.95rem; outline: none; margin-bottom: 1.1rem; transition: all 0.2s;
+    }
+    .auth-section input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); background: var(--surface-3); }
+    .auth-section input::placeholder { color: var(--text-3); }
+    .btn-auth {
+      width: 100%; padding: 0.9rem;
+      background: linear-gradient(135deg, var(--accent), #9d7aff);
+      color: #fff; border: none; border-radius: 13px;
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: all 0.3s; margin-bottom: 1rem;
+    }
+    .btn-auth:hover { transform: translateY(-2px); box-shadow: 0 12px 36px var(--accent-glow); }
+    .btn-auth:active { transform: translateY(0); }
+    .auth-toggle { text-align: center; font-size: 0.875rem; color: var(--text-2); }
+    .auth-toggle a { color: var(--accent-2); cursor: pointer; font-weight: 600; }
+    .auth-toggle a:hover { text-decoration: underline; }
 
-    /* ── Decks home page ── */
+    /* ── Decks home ── */
     .decks-section { display: none; }
-    .decks-section.active { display: block; }
-    .decks-header {
-      display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;
-    }
-    .decks-header h2 { font-size: 1.4rem; font-weight: 700; }
+    .decks-section.active { display: block; animation: fadeUp 0.3s ease; }
+    .decks-header { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap; }
+    .decks-header h2 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.5rem; font-weight: 800; }
+    .decks-header .deck-sub { color: var(--text-2); font-size: 0.85rem; margin-top: 0.15rem; }
     .btn-create-deck {
-      padding: 0.6rem 1.4rem; background: var(--card-front); color: #fff; border: none;
-      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
-      cursor: pointer; transition: all 0.3s;
+      display: flex; align-items: center; gap: 0.35rem;
+      padding: 0.65rem 1.35rem;
+      background: linear-gradient(135deg, var(--accent), #9d7aff);
+      color: #fff; border: none; border-radius: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.875rem; font-weight: 700;
+      cursor: pointer; transition: all 0.3s; white-space: nowrap;
     }
-    .btn-create-deck:hover { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
+    .btn-create-deck:hover { transform: translateY(-2px); box-shadow: 0 8px 24px var(--accent-glow); }
 
-    .decks-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-      gap: 1rem;
-    }
+    .decks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
     .deck-card {
-      background: var(--surface);
-      border: 1px solid #333355;
-      border-radius: 16px;
-      padding: 1.5rem;
-      cursor: pointer;
-      transition: all 0.25s ease;
-      position: relative;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 18px; padding: 1.4rem 1.5rem;
+      cursor: pointer; transition: all 0.25s ease; position: relative; overflow: hidden;
+    }
+    .deck-card::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+      background: var(--card-accent, var(--accent));
     }
     .deck-card:hover {
-      border-color: var(--accent);
-      transform: translateY(-4px);
-      box-shadow: 0 12px 40px var(--accent-glow);
+      border-color: rgba(124,92,252,0.35); transform: translateY(-4px);
+      box-shadow: 0 16px 48px rgba(0,0,0,0.28), 0 0 0 1px rgba(124,92,252,0.18);
+    }
+    .deck-emoji {
+      width: 40px; height: 40px; border-radius: 11px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.15rem; margin-bottom: 0.85rem;
     }
     .deck-card .deck-name {
-      font-size: 1.1rem;
-      font-weight: 700;
-      margin-bottom: 0.4rem;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.975rem; font-weight: 700;
+      margin-bottom: 0.5rem; padding-right: 1.8rem;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .deck-card .deck-count {
-      font-size: 0.85rem;
-      color: var(--text-muted);
+    .deck-meta { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+    .deck-chip {
+      display: inline-flex; align-items: center;
+      padding: 0.2rem 0.55rem; background: var(--surface-2);
+      border-radius: 6px; font-size: 0.75rem; color: var(--text-2); font-weight: 500;
     }
-    .deck-card .deck-date {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      margin-top: 0.6rem;
-      opacity: 0.7;
-    }
+    .deck-card .deck-date { font-size: 0.73rem; color: var(--text-3); margin-top: 0.5rem; }
     .deck-delete {
-      position: absolute;
-      top: 0.8rem;
-      right: 0.8rem;
-      background: none;
-      border: none;
-      color: var(--text-muted);
-      font-size: 1.1rem;
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.2s;
-      padding: 0.2rem;
+      position: absolute; top: 0.85rem; right: 0.85rem;
+      background: none; border: none; color: var(--text-3);
+      font-size: 1rem; cursor: pointer; opacity: 0; transition: all 0.2s;
+      padding: 0.2rem 0.3rem; border-radius: 6px;
     }
     .deck-card:hover .deck-delete { opacity: 1; }
-    .deck-delete:hover { color: #fca5a5; }
+    .deck-delete:hover { color: var(--error); background: rgba(248,113,113,0.1); }
+    .decks-empty { text-align: center; padding: 4rem 2rem; }
+    .empty-icon { font-size: 3.5rem; display: block; margin-bottom: 1rem; opacity: 0.4; }
+    .decks-empty h3 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.4rem; }
+    .decks-empty p { color: var(--text-2); font-size: 0.875rem; }
 
-    .decks-empty {
-      text-align: center;
-      padding: 3rem;
-      color: var(--text-muted);
+    /* ── Upload ── */
+    #upload-area { animation: fadeUp 0.3s ease; }
+    .deck-name-input { margin-bottom: 1rem; }
+    .deck-name-input input {
+      width: 100%; padding: 0.9rem 1.2rem;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 14px; color: var(--text);
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 700;
+      outline: none; transition: all 0.2s; text-align: center;
     }
-    .decks-empty p { font-size: 1rem; margin-bottom: 0.5rem; }
-    .decks-empty span { font-size: 0.85rem; }
-
-    /* Upload area */
+    .deck-name-input input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .deck-name-input input::placeholder { color: var(--text-3); font-weight: 400; font-family: 'Inter', sans-serif; }
     .upload-section {
-      background: var(--surface); border: 2px dashed #333355; border-radius: 20px;
-      padding: 3rem 2rem; text-align: center; transition: all 0.3s ease;
-      cursor: pointer; position: relative; overflow: hidden;
+      background: var(--surface); border: 2px dashed rgba(255,255,255,0.08);
+      border-radius: 20px; padding: 3rem 2rem; text-align: center;
+      transition: all 0.3s ease; cursor: pointer; overflow: hidden;
     }
     .upload-section:hover, .upload-section.drag-over {
-      border-color: var(--accent); box-shadow: 0 0 40px var(--accent-glow);
+      border-color: var(--accent); background: var(--surface-2);
+      box-shadow: 0 0 40px var(--accent-glow);
     }
-    .upload-section.drag-over { transform: scale(1.01); }
+    .upload-section.drag-over { transform: scale(1.005); }
     .upload-icon {
-      width: 72px; height: 72px; margin: 0 auto 1.2rem; background: var(--surface-2);
-      border-radius: 18px; display: flex; align-items: center; justify-content: center; font-size: 2rem;
+      width: 72px; height: 72px; margin: 0 auto 1.25rem;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 20px; display: flex; align-items: center; justify-content: center; font-size: 2rem;
     }
-    .upload-section h2 { font-size: 1.3rem; font-weight: 600; margin-bottom: 0.4rem; }
-    .upload-section p { color: var(--text-muted); font-size: 0.9rem; }
+    .upload-section h2 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .upload-section p { color: var(--text-2); font-size: 0.875rem; }
     .upload-section input { display: none; }
-
-    /* Deck name input */
-    .deck-name-input {
-      margin-bottom: 1rem;
+    .file-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; justify-content: center; }
+    .file-chip {
+      display: flex; align-items: center; gap: 0.4rem;
+      padding: 0.35rem 0.75rem;
+      background: rgba(124,92,252,0.1); border: 1px solid rgba(124,92,252,0.2);
+      border-radius: 8px; font-size: 0.8rem; color: var(--accent-2);
     }
-    .deck-name-input input {
-      width: 100%; padding: 0.85rem 1.2rem; background: var(--surface); border: 1px solid #333355;
-      border-radius: 12px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 1.1rem;
-      font-weight: 600; outline: none; transition: border-color 0.2s; text-align: center;
-    }
-    .deck-name-input input:focus { border-color: var(--accent); }
-    .deck-name-input input::placeholder { color: var(--text-muted); font-weight: 400; }
+    .file-chip .chip-remove { background: none; border: none; color: var(--text-2); cursor: pointer; font-size: 0.9rem; padding: 0; transition: color 0.15s; }
+    .file-chip .chip-remove:hover { color: var(--error); }
 
-    .api-section { margin-top: 1.5rem; display: flex; gap: 0.75rem; align-items: center; }
-
-    .btn-generate {
-      padding: 0.85rem 2rem; background: var(--card-front); color: #fff; border: none;
-      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 1rem; font-weight: 600;
-      cursor: pointer; transition: all 0.3s ease; white-space: nowrap; flex: 1;
-    }
-    .btn-generate:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 30px var(--accent-glow); }
-    .btn-generate:disabled { opacity: 0.5; cursor: not-allowed; }
-
-    .btn-back-decks {
-      padding: 0.85rem 1.5rem; background: var(--surface-2); color: var(--text-muted); border: 1px solid #333355;
-      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 0.95rem;
+    .api-section { display: flex; gap: 0.75rem; margin-top: 1rem; align-items: center; }
+    .btn-back-decks-upload {
+      padding: 0.85rem 1.5rem; background: var(--surface-2);
+      color: var(--text-2); border: 1px solid var(--border);
+      border-radius: 12px; font-family: 'Inter', sans-serif; font-size: 0.9rem;
       cursor: pointer; transition: all 0.2s; white-space: nowrap;
     }
-    .btn-back-decks:hover { border-color: var(--accent); color: var(--text); }
-
-    /* Loading */
-    .loading-section { display: none; text-align: center; padding: 4rem 2rem; }
-    .loading-section.active { display: block; }
-    .spinner {
-      width: 56px; height: 56px; margin: 0 auto 1.5rem; border: 4px solid var(--surface-2);
-      border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite;
+    .btn-back-decks-upload:hover { border-color: var(--accent-2); color: var(--text); }
+    .btn-generate {
+      flex: 1; padding: 0.85rem 2rem;
+      background: linear-gradient(135deg, var(--accent), #9d7aff);
+      color: #fff; border: none; border-radius: 12px;
+      font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1rem; font-weight: 700;
+      cursor: pointer; transition: all 0.3s;
     }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .loading-section p { color: var(--text-muted); font-size: 1rem; }
-
-    /* Flash cards section */
-    .cards-section { display: none; margin-top: 2rem; }
-    .cards-section.active { display: block; }
-    .cards-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; flex-wrap: wrap; gap: 0.5rem; }
-    .cards-header h2 { font-size: 1.4rem; font-weight: 700; }
-    .card-counter { font-size: 0.95rem; color: var(--text-muted); background: var(--surface); padding: 0.4rem 1rem; border-radius: 20px; }
-    .btn-new {
-      padding: 0.5rem 1.2rem; background: var(--surface-2); color: var(--accent-light);
-      border: 1px solid #333355; border-radius: 10px; font-family: 'Inter', sans-serif;
-      font-size: 0.85rem; font-weight: 500; cursor: pointer; transition: all 0.2s;
-    }
-    .btn-new:hover { border-color: var(--accent); background: var(--surface); }
-
-    .card-viewport { perspective: 1200px; height: 340px; margin-bottom: 1.5rem; }
-    .flashcard {
-      width: 100%; height: 100%; position: relative; transform-style: preserve-3d;
-      transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer;
-    }
-    .flashcard.flipped { transform: rotateY(180deg); }
-    .card-face {
-      position: absolute; inset: 0; backface-visibility: hidden; border-radius: 24px;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      padding: 2.5rem; text-align: center;
-    }
-    .card-front { background: var(--card-front); box-shadow: 0 20px 60px rgba(124,92,252,0.2); }
-    .card-front .card-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; opacity: 0.7; margin-bottom: 1rem; }
-    .card-front .card-term { font-size: 2rem; font-weight: 700; line-height: 1.3; }
-    .card-front .card-hint { margin-top: 1.5rem; font-size: 0.8rem; opacity: 0.6; }
-    .card-back {
-      background: var(--card-back); border: 1px solid #333355; transform: rotateY(180deg);
-      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .card-back .card-label { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 2px; color: var(--accent-light); margin-bottom: 1rem; }
-    .card-back .card-definition { font-size: 1.15rem; line-height: 1.7; color: var(--text); }
-
-    .card-nav { display: flex; justify-content: center; align-items: center; gap: 1.5rem; }
-    .nav-btn {
-      width: 52px; height: 52px; border-radius: 50%; background: var(--surface);
-      border: 1px solid #333355; color: var(--text); font-size: 1.3rem; cursor: pointer;
-      display: flex; align-items: center; justify-content: center; transition: all 0.2s;
-    }
-    .nav-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-2); transform: scale(1.08); }
-    .nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
-
-    .progress-dots { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; max-width: 300px; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--surface-2); border: 1px solid #333355; transition: all 0.3s; }
-    .dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 10px var(--accent-glow); }
-    .dot.seen { background: #444466; }
-
-    .kb-hints { text-align: center; margin-top: 1.5rem; color: var(--text-muted); font-size: 0.8rem; }
-    .kb-hints kbd {
-      padding: 0.15rem 0.5rem; background: var(--surface-2); border: 1px solid #333355;
-      border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 0.75rem;
-    }
-
-    /* Modal */
-    .modal-overlay {
-      display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6);
-      backdrop-filter: blur(6px); z-index: 100; align-items: center; justify-content: center;
-    }
-    .modal-overlay.active { display: flex; }
-    .modal {
-      background: var(--surface); border: 1px solid #333355; border-radius: 20px;
-      padding: 2rem; width: 90%; max-width: 500px; position: relative;
-    }
-    .modal h3 { font-size: 1.2rem; font-weight: 700; margin-bottom: 1.2rem; }
-    .modal label { display: block; font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.3rem; font-weight: 500; }
-    .modal input, .modal textarea {
-      width: 100%; padding: 0.75rem 1rem; background: var(--surface-2); border: 1px solid #333355;
-      border-radius: 10px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.95rem;
-      outline: none; margin-bottom: 1rem; transition: border-color 0.2s; resize: vertical;
-    }
-    .modal input:focus, .modal textarea:focus { border-color: var(--accent); }
-    .modal textarea { min-height: 80px; }
-    .modal-actions { display: flex; gap: 0.75rem; justify-content: flex-end; }
-    .btn-modal-cancel {
-      padding: 0.6rem 1.4rem; background: transparent; border: 1px solid #333355;
-      border-radius: 10px; color: var(--text-muted); font-family: 'Inter', sans-serif;
-      font-size: 0.9rem; cursor: pointer; transition: all 0.2s;
-    }
-    .btn-modal-cancel:hover { border-color: var(--text-muted); }
-    .btn-modal-save {
-      padding: 0.6rem 1.4rem; background: var(--card-front); border: none; border-radius: 10px;
-      color: #fff; font-family: 'Inter', sans-serif; font-size: 0.9rem; font-weight: 600;
-      cursor: pointer; transition: all 0.2s;
-    }
-    .btn-modal-save:hover { transform: translateY(-1px); box-shadow: 0 4px 20px var(--accent-glow); }
-    .btn-close-modal {
-      position: absolute; top: 1rem; right: 1rem; background: none; border: none;
-      color: var(--text-muted); font-size: 1.3rem; cursor: pointer;
-    }
-
-    .cards-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; align-items: center; }
-    .file-chips { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.8rem; }
-    .file-chip {
-      padding: 0.35rem 0.8rem; background: var(--surface-2); border-radius: 8px;
-      font-size: 0.8rem; color: var(--accent-light); display: flex; align-items: center; gap: 0.4rem;
-    }
-    .file-chip .chip-remove {
-      background: none; border: none; color: var(--text-muted); cursor: pointer;
-      font-size: 0.9rem; padding: 0; line-height: 1;
-    }
-    .file-chip .chip-remove:hover { color: #fca5a5; }
-
-    .save-indicator {
-      position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.5rem 1rem;
-      background: var(--surface); border: 1px solid rgba(52,211,153,0.3); border-radius: 10px;
-      color: var(--success); font-size: 0.8rem; font-family: 'Inter', sans-serif;
-      opacity: 0; transition: opacity 0.3s; z-index: 50;
-    }
-    .save-indicator.show { opacity: 1; }
+    .btn-generate:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 10px 30px var(--accent-glow); }
+    .btn-generate:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
 
     .error-msg {
-      background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5;
-      padding: 1rem 1.5rem; border-radius: 12px; margin-top: 1rem; display: none; font-size: 0.9rem;
+      background: rgba(248,113,113,0.08); border: 1px solid rgba(248,113,113,0.18);
+      color: var(--error); padding: 0.9rem 1.2rem; border-radius: 12px;
+      margin-top: 1rem; display: none; font-size: 0.875rem;
     }
     .error-msg.active { display: block; }
 
+    /* ── Loading ── */
+    .loading-section { display: none; text-align: center; padding: 5rem 2rem; }
+    .loading-section.active { display: block; }
+    .spinner { width: 52px; height: 52px; border: 3px solid var(--surface-3); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 1.5rem; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .loading-section h3 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.1rem; font-weight: 700; margin-bottom: 0.35rem; }
+    .loading-section p { color: var(--text-2); font-size: 0.875rem; }
+
+    /* ── Cards viewer ── */
+    .cards-section { display: none; margin-top: 0; }
+    .cards-section.active { display: block; animation: fadeUp 0.3s ease; }
+
+    .cards-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 0.75rem; }
+    .cards-header-left { display: flex; align-items: center; gap: 0.75rem; }
+    .btn-back-pill {
+      display: flex; align-items: center; gap: 0.3rem;
+      padding: 0.45rem 0.9rem;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text-2);
+      font-family: 'Inter', sans-serif; font-size: 0.82rem; cursor: pointer; transition: all 0.2s;
+    }
+    .btn-back-pill:hover { border-color: var(--accent-2); color: var(--text); }
+    .cards-header h2 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.2rem; font-weight: 800; }
+    .cards-actions { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+    .btn-new {
+      padding: 0.4rem 0.85rem;
+      background: var(--surface-2); border: 1px solid var(--border);
+      border-radius: 9px; color: var(--text-2);
+      font-family: 'Inter', sans-serif; font-size: 0.8rem; font-weight: 500;
+      cursor: pointer; transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-new:hover { border-color: var(--accent-2); color: var(--text); background: var(--surface-3); }
+
+    /* Progress bar */
+    .study-bar { margin-bottom: 1.5rem; }
+    .study-bar-top { display: flex; justify-content: space-between; margin-bottom: 0.45rem; }
+    .study-bar-label { font-size: 0.775rem; color: var(--text-2); }
+    .card-counter { font-size: 0.775rem; font-weight: 600; color: var(--accent-2); }
+    .study-track { height: 5px; background: var(--surface-3); border-radius: 99px; overflow: hidden; }
+    .study-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius: 99px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1); }
+
+    /* Flash card */
+    .card-viewport { perspective: 1200px; height: 380px; margin-bottom: 1.5rem; }
+    .flashcard { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.4,0,0.2,1); cursor: pointer; }
+    .flashcard.flipped { transform: rotateY(180deg); }
+    .card-face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 24px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2.75rem 3rem; text-align: center; }
+    .card-front {
+      background: linear-gradient(145deg, #5535e0 0%, #7c5cfc 55%, #a78bfa 100%);
+      box-shadow: 0 24px 72px rgba(85,53,224,0.3), inset 0 1px 0 rgba(255,255,255,0.12);
+    }
+    .card-front .card-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; opacity: 0.55; margin-bottom: 1.25rem; }
+    .card-front .card-term { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 2.2rem; font-weight: 800; line-height: 1.2; letter-spacing: -0.5px; word-break: break-word; }
+    .card-front .card-hint { margin-top: 2rem; font-size: 0.775rem; opacity: 0.45; }
+    .card-back {
+      background: var(--surface-2); border: 1px solid rgba(255,255,255,0.07);
+      transform: rotateY(180deg);
+      box-shadow: 0 24px 72px rgba(0,0,0,0.4);
+    }
+    .card-back .card-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: var(--accent-2); margin-bottom: 1.25rem; }
+    .card-back .card-definition { font-size: 1.1rem; line-height: 1.8; color: var(--text); max-width: 560px; }
+
+    /* Nav */
+    .card-nav { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-bottom: 1.25rem; }
+    .nav-btn {
+      width: 48px; height: 48px; border-radius: 14px;
+      background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); font-size: 1.1rem; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; transition: all 0.2s;
+    }
+    .nav-btn:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-2); transform: scale(1.07); }
+    .nav-btn:disabled { opacity: 0.2; cursor: not-allowed; transform: none; }
+    .progress-dots { display: flex; gap: 5px; flex-wrap: wrap; justify-content: center; max-width: 280px; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--surface-3); border: 1px solid var(--border); transition: all 0.3s; cursor: pointer; }
+    .dot.active { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 7px var(--accent-glow); transform: scale(1.35); }
+    .dot.seen { background: var(--surface-3); border-color: rgba(124,92,252,0.28); }
+    .kb-hints { text-align: center; color: var(--text-3); font-size: 0.775rem; }
+    .kb-hints kbd { padding: 0.15rem 0.45rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 5px; font-family: 'Inter', sans-serif; font-size: 0.72rem; color: var(--text-2); }
+
+    /* ── Modal ── */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(8px); z-index: 100; align-items: center; justify-content: center; padding: 1rem; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 24px; padding: 2rem; width: 100%; max-width: 480px; position: relative; box-shadow: 0 28px 80px rgba(0,0,0,0.5); animation: fadeUp 0.25s ease; }
+    .modal h3 { font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.15rem; font-weight: 800; margin-bottom: 0.25rem; }
+    .modal .modal-sub { color: var(--text-2); font-size: 0.85rem; margin-bottom: 1.5rem; }
+    .modal label { display: block; font-size: 0.775rem; font-weight: 600; color: var(--text-2); margin-bottom: 0.4rem; text-transform: uppercase; letter-spacing: 0.6px; }
+    .modal input, .modal textarea { width: 100%; padding: 0.75rem 1rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 11px; color: var(--text); font-family: 'Inter', sans-serif; font-size: 0.95rem; outline: none; margin-bottom: 1rem; transition: all 0.2s; resize: vertical; }
+    .modal input:focus, .modal textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .modal textarea { min-height: 88px; }
+    .modal-actions { display: flex; gap: 0.65rem; justify-content: flex-end; }
+    .btn-modal-cancel { padding: 0.6rem 1.35rem; background: transparent; border: 1px solid var(--border); border-radius: 10px; color: var(--text-2); font-family: 'Inter', sans-serif; font-size: 0.875rem; cursor: pointer; transition: all 0.2s; }
+    .btn-modal-cancel:hover { border-color: var(--text-2); color: var(--text); }
+    .btn-modal-save { padding: 0.6rem 1.35rem; background: linear-gradient(135deg, var(--accent), #9d7aff); border: none; border-radius: 10px; color: #fff; font-family: 'Plus Jakarta Sans', sans-serif; font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: all 0.2s; }
+    .btn-modal-save:hover { transform: translateY(-1px); box-shadow: 0 5px 18px var(--accent-glow); }
+    .btn-close-modal { position: absolute; top: 1.1rem; right: 1.1rem; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; color: var(--text-2); font-size: 1rem; cursor: pointer; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .btn-close-modal:hover { color: var(--text); border-color: var(--text-2); }
+
+    /* ── Toasts ── */
+    .save-indicator { position: fixed; bottom: 1.5rem; right: 1.5rem; padding: 0.5rem 1rem; background: var(--surface); border: 1px solid rgba(74,222,128,0.3); border-radius: 10px; color: var(--success); font-size: 0.8rem; font-family: 'Inter', sans-serif; opacity: 0; transition: opacity 0.3s; z-index: 50; }
+    .save-indicator.show { opacity: 1; }
+    #error-toast { position: fixed; bottom: 1.5rem; left: 1.5rem; padding: 0.75rem 1.1rem; background: var(--surface); border: 1px solid rgba(248,113,113,0.3); border-radius: 12px; color: var(--error); font-size: 0.85rem; font-family: 'Inter', sans-serif; max-width: 360px; white-space: normal; opacity: 0; transform: translateY(8px); transition: all 0.3s; z-index: 50; }
+    #error-toast.show { opacity: 1; transform: translateY(0); }
+
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
     @media (max-width: 600px) {
-      header h1 { font-size: 1.8rem; }
-      .card-viewport { height: 300px; }
-      .card-front .card-term { font-size: 1.5rem; }
-      .upload-section { padding: 2rem 1.2rem; }
-      .auth-section { padding: 2rem 1.2rem; }
+      .card-viewport { height: 310px; }
+      .card-face { padding: 2rem 1.5rem; }
+      .card-front .card-term { font-size: 1.65rem; }
+      .card-back .card-definition { font-size: 1rem; }
+      .upload-section { padding: 2rem 1.25rem; }
+      .auth-card { padding: 2rem 1.5rem; }
       .decks-grid { grid-template-columns: 1fr; }
       .api-section { flex-direction: column; }
+      .cards-header { flex-direction: column; align-items: flex-start; }
+      .container { padding: 1.5rem 1rem 3rem; }
     }
   </style>
 </head>
 <body>
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
   <div class="container">
     <header>
-      <h1>FlashGenius</h1>
-      <p>Upload a PDF, get instant vocabulary flash cards</p>
+      <div class="brand-pill">
+        <div class="brand-ico">⚡</div>
+        <span class="brand-text">FlashGenius</span>
+      </div>
+      <p>Upload a PDF and get instant vocabulary flash cards powered by AI</p>
     </header>
 
     <div class="user-bar" id="user-bar">
+      <div class="user-avatar" id="user-avatar">?</div>
       <span class="user-name" id="user-display"></span>
       <button class="btn-logout" id="btn-logout">Sign Out</button>
     </div>
 
     <!-- Auth -->
     <div id="auth-section" class="auth-section">
-      <h2 id="auth-title">Sign In</h2>
-      <p class="auth-subtitle" id="auth-subtitle">Welcome back! Sign in to access your cards.</p>
-      <div class="auth-error" id="auth-error"></div>
-      <div class="auth-success" id="auth-success"></div>
-      <label for="auth-username">Username</label>
-      <input type="text" id="auth-username" placeholder="Enter username" autocomplete="username">
-      <label for="auth-password">Password</label>
-      <input type="password" id="auth-password" placeholder="Enter password" autocomplete="current-password">
-      <button class="btn-auth" id="btn-auth">Sign In</button>
-      <div class="auth-toggle">
-        <span id="auth-toggle-text">Don't have an account? </span>
-        <a id="auth-toggle-link">Sign Up</a>
+      <div class="auth-card">
+        <div class="auth-icon">🎓</div>
+        <h2 id="auth-title">Sign In</h2>
+        <p class="auth-subtitle" id="auth-subtitle">Welcome back! Sign in to access your cards.</p>
+        <div class="auth-error" id="auth-error"></div>
+        <div class="auth-success" id="auth-success"></div>
+        <label for="auth-username">Username</label>
+        <input type="text" id="auth-username" placeholder="Enter your username" autocomplete="username">
+        <label for="auth-password">Password</label>
+        <input type="password" id="auth-password" placeholder="Enter your password" autocomplete="current-password">
+        <button class="btn-auth" id="btn-auth">Sign In</button>
+        <div class="auth-toggle">
+          <span id="auth-toggle-text">Don't have an account? </span>
+          <a id="auth-toggle-link">Sign Up</a>
+        </div>
       </div>
     </div>
 
     <!-- Decks home -->
     <div class="decks-section" id="decks-section">
       <div class="decks-header">
-        <h2>Your Decks</h2>
+        <div>
+          <h2>Your Decks</h2>
+          <p class="deck-sub">Select a deck to study or create a new one</p>
+        </div>
         <button class="btn-create-deck" id="btn-create-deck">+ New Deck</button>
       </div>
       <div id="decks-grid" class="decks-grid"></div>
       <div class="decks-empty" id="decks-empty" style="display:none">
-        <p>No decks yet</p>
-        <span>Click "+ New Deck" to create your first deck from a PDF</span>
+        <span class="empty-icon">📚</span>
+        <h3>No decks yet</h3>
+        <p>Click "+ New Deck" to create your first deck from a PDF</p>
       </div>
     </div>
 
@@ -444,8 +463,8 @@
       </div>
 
       <div class="api-section">
-        <button class="btn-back-decks" id="btn-back-from-upload">Back</button>
-        <button class="btn-generate" id="btn-generate" disabled>Generate Cards</button>
+        <button class="btn-back-decks-upload" id="btn-back-from-upload">← Back</button>
+        <button class="btn-generate" id="btn-generate" disabled>✨ Generate Cards</button>
       </div>
 
       <div class="error-msg" id="error-msg"></div>
@@ -454,20 +473,32 @@
     <!-- Loading -->
     <div class="loading-section" id="loading">
       <div class="spinner"></div>
-      <p>Extracting vocabulary from your PDF...</p>
+      <h3>Analyzing your PDF…</h3>
+      <p>Extracting vocabulary terms with AI</p>
     </div>
 
     <!-- Flash Cards viewer -->
     <div class="cards-section" id="cards-section">
       <div class="cards-header">
-        <h2 id="cards-deck-title">Flash Cards</h2>
+        <div class="cards-header-left">
+          <button class="btn-back-pill" id="btn-back-decks-2">← All Decks</button>
+          <h2 id="cards-deck-title">Flash Cards</h2>
+        </div>
         <div class="cards-actions">
-          <span class="card-counter" id="card-counter">1 / 10</span>
           <button class="btn-new" id="btn-add-card">+ Add Card</button>
           <button class="btn-new" id="btn-add-pdf">+ Add PDF</button>
-          <button class="btn-new" id="btn-generate-more" style="color:var(--success);border-color:rgba(52,211,153,0.3)">Generate More Terms</button>
-          <button class="btn-new" id="btn-back-decks-2">All Decks</button>
-          <button class="btn-new" id="btn-delete-deck" style="color:#fca5a5;border-color:rgba(239,68,68,0.3)">Delete Deck</button>
+          <button class="btn-new" id="btn-generate-more" style="color:var(--success);border-color:rgba(74,222,128,0.2)">⟳ More Terms</button>
+          <button class="btn-new" id="btn-delete-deck" style="color:var(--error);border-color:rgba(248,113,113,0.2)">Delete Deck</button>
+        </div>
+      </div>
+
+      <div class="study-bar">
+        <div class="study-bar-top">
+          <span class="study-bar-label">Progress</span>
+          <span class="card-counter" id="card-counter">1 / 10</span>
+        </div>
+        <div class="study-track">
+          <div class="study-fill" id="study-fill" style="width:10%"></div>
         </div>
       </div>
 
@@ -492,7 +523,7 @@
       </div>
 
       <div class="kb-hints">
-        <kbd>&#8592;</kbd> Previous &nbsp; <kbd>Space</kbd> Flip &nbsp; <kbd>&#8594;</kbd> Next
+        <kbd>←</kbd> Previous &nbsp;·&nbsp; <kbd>Space</kbd> Flip &nbsp;·&nbsp; <kbd>→</kbd> Next
       </div>
     </div>
   </div>
@@ -502,6 +533,7 @@
     <div class="modal">
       <button class="btn-close-modal" id="modal-close">&times;</button>
       <h3>Add a Flash Card</h3>
+      <p class="modal-sub">Manually add a term and definition to this deck</p>
       <label for="manual-term">Term</label>
       <input type="text" id="manual-term" placeholder="e.g. Mitochondria">
       <label for="manual-def">Definition</label>
@@ -513,8 +545,8 @@
     </div>
   </div>
 
-  <div class="save-indicator" id="save-indicator">Saved</div>
-  <div class="save-indicator" id="error-toast" style="border-color:rgba(239,68,68,0.3);color:#fca5a5;left:1.5rem;right:auto;max-width:400px;white-space:normal"></div>
+  <div class="save-indicator" id="save-indicator">✓ Saved</div>
+  <div id="error-toast"></div>
 
   <script>
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
@@ -561,6 +593,7 @@
     const cardDef = document.getElementById('card-definition');
     const cardCounter = document.getElementById('card-counter');
     const progressDots = document.getElementById('progress-dots');
+    const studyFill = document.getElementById('study-fill');
     const btnPrev = document.getElementById('btn-prev');
     const btnNext = document.getElementById('btn-next');
     const btnAddCard = document.getElementById('btn-add-card');
@@ -578,12 +611,15 @@
     // ── State ──
     let currentUser = null;
     let isSignUp = false;
-    let decks = []; // [{name, cards, createdAt}]
+    let decks = [];
     let activeDeckIndex = -1;
     let currentIndex = 0;
     let pdfFiles = [];
     let lastExtractedText = '';
-    let addingToDeck = false; // true = adding PDFs to existing deck
+    let addingToDeck = false;
+
+    const DECK_COLORS = ['#7c5cfc','#f472b6','#2dd4bf','#f59e0b','#ef4444','#10b981','#60a5fa','#f97316'];
+    const DECK_ICONS  = ['📘','🧬','⚗️','📐','🏛️','💡','💻','🎭'];
 
     // ── Firebase ──
     async function hashPassword(pw) {
@@ -651,7 +687,7 @@
         if (isSignUp) {
           if (userData !== null) { showAuthError('Username already taken.'); return; }
           await fbSet(`users/${safe}`, { password: hashedPw, decks: [] });
-          showAuthSuccess('Account created! Signing you in...');
+          showAuthSuccess('Account created! Signing you in…');
           setTimeout(() => loginAs(safe, []), 800);
         } else {
           if (!userData) { showAuthError('Account not found.'); return; }
@@ -670,20 +706,16 @@
       decks = savedDecks;
       userBar.classList.add('active');
       userDisplay.textContent = username;
+      document.getElementById('user-avatar').textContent = username.charAt(0).toUpperCase();
       sessionStorage.setItem('fg_user', username);
       showDecksHome();
     }
 
     btnLogout.addEventListener('click', () => {
-      currentUser = null;
-      decks = [];
-      activeDeckIndex = -1;
-      pdfFiles = [];
-      lastExtractedText = '';
+      currentUser = null; decks = []; activeDeckIndex = -1; pdfFiles = []; lastExtractedText = '';
       sessionStorage.removeItem('fg_user');
       userBar.classList.remove('active');
-      authUsername.value = '';
-      authPassword.value = '';
+      authUsername.value = ''; authPassword.value = '';
       hideAuthMessages();
       showView('auth');
     });
@@ -702,9 +734,7 @@
 
     // ── Decks home ──
     function showDecksHome() {
-      activeDeckIndex = -1;
-      addingToDeck = false;
-      pdfFiles = [];
+      activeDeckIndex = -1; addingToDeck = false; pdfFiles = [];
       renderFileChips();
       showView('decks');
       renderDecksGrid();
@@ -715,13 +745,19 @@
       decksEmpty.style.display = decks.length === 0 ? 'block' : 'none';
 
       decks.forEach((deck, i) => {
+        const color = DECK_COLORS[i % DECK_COLORS.length];
+        const icon  = DECK_ICONS[i % DECK_ICONS.length];
         const el = document.createElement('div');
         el.className = 'deck-card';
+        el.style.setProperty('--card-accent', color);
         const cardCount = deck.cards ? deck.cards.length : 0;
         const date = deck.createdAt ? new Date(deck.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
         el.innerHTML = `
+          <div class="deck-emoji" style="background:${color}18;color:${color}">${icon}</div>
           <div class="deck-name">${escapeHtml(deck.name)}</div>
-          <div class="deck-count">${cardCount} card${cardCount !== 1 ? 's' : ''}</div>
+          <div class="deck-meta">
+            <span class="deck-chip">${cardCount} card${cardCount !== 1 ? 's' : ''}</span>
+          </div>
           ${date ? `<div class="deck-date">${date}</div>` : ''}
           <button class="deck-delete" title="Delete deck">&times;</button>
         `;
@@ -748,8 +784,7 @@
 
     btnCreateDeck.addEventListener('click', () => {
       addingToDeck = false;
-      deckNameInput.value = '';
-      pdfFiles = [];
+      deckNameInput.value = ''; pdfFiles = [];
       renderFileChips();
       btnGenerate.disabled = true;
       hideError();
@@ -839,14 +874,11 @@
       return JSON.parse(raw.replace(/^```json?\s*/i, '').replace(/```\s*$/, '').trim());
     }
 
-    // Generate cards
     btnGenerate.addEventListener('click', async () => {
       hideError();
       if (pdfFiles.length === 0) return;
-
       const deckName = deckNameInput.value.trim() || `Deck ${decks.length + 1}`;
       showView('loading');
-
       try {
         let combinedText = '';
         const newCards = [];
@@ -860,18 +892,14 @@
         if (combinedText) lastExtractedText = combinedText;
         pdfFiles = [];
         renderFileChips();
-
         if (newCards.length === 0) throw new Error('No vocabulary terms could be extracted.');
-
         if (addingToDeck && activeDeckIndex >= 0) {
-          // Append to existing deck, filtering duplicates
           const existLower = decks[activeDeckIndex].cards.map(c => c.term.toLowerCase());
           const unique = newCards.filter(c => !existLower.includes(c.term.toLowerCase()));
           decks[activeDeckIndex].cards.push(...unique);
           decks[activeDeckIndex].sourceText = (decks[activeDeckIndex].sourceText || '') + combinedText;
           addingToDeck = false;
         } else {
-          // Create new deck
           decks.push({ name: deckName, cards: newCards, createdAt: new Date().toISOString(), sourceText: combinedText });
           activeDeckIndex = decks.length - 1;
         }
@@ -879,11 +907,8 @@
         currentIndex = 0;
         openDeck(activeDeckIndex);
       } catch (err) {
-        if (addingToDeck && activeDeckIndex >= 0) {
-          openDeck(activeDeckIndex);
-        } else {
-          showView('upload');
-        }
+        if (addingToDeck && activeDeckIndex >= 0) openDeck(activeDeckIndex);
+        else showView('upload');
         showError(err.message);
       }
     });
@@ -892,10 +917,7 @@
     function openDeck(index) {
       activeDeckIndex = index;
       const deck = decks[index];
-      if (!deck || !deck.cards || deck.cards.length === 0) {
-        showDecksHome();
-        return;
-      }
+      if (!deck || !deck.cards || deck.cards.length === 0) { showDecksHome(); return; }
       cardsDeckTitle.textContent = deck.name;
       lastExtractedText = deck.sourceText || '';
       currentIndex = 0;
@@ -913,6 +935,7 @@
       cardTerm.textContent = cards[index].term;
       cardDef.textContent = cards[index].definition;
       cardCounter.textContent = `${index + 1} / ${cards.length}`;
+      studyFill.style.width = `${((index + 1) / cards.length * 100).toFixed(1)}%`;
       btnPrev.disabled = index === 0;
       btnNext.disabled = index === cards.length - 1;
       document.querySelectorAll('.dot').forEach((dot, i) => {
@@ -935,10 +958,8 @@
     btnPrev.addEventListener('click', () => { if (currentIndex > 0) renderCard(currentIndex - 1); });
     btnNext.addEventListener('click', () => { const c = getActiveCards(); if (currentIndex < c.length - 1) renderCard(currentIndex + 1); });
 
-    // Back to decks
     btnBackDecks2.addEventListener('click', showDecksHome);
 
-    // Delete current deck
     btnDeleteDeck.addEventListener('click', () => {
       if (activeDeckIndex < 0) return;
       if (!confirm(`Delete "${decks[activeDeckIndex].name}"? This cannot be undone.`)) return;
@@ -947,7 +968,6 @@
       showDecksHome();
     });
 
-    // Add PDF to current deck
     btnAddPdf.addEventListener('click', () => {
       addingToDeck = true;
       deckNameInput.value = decks[activeDeckIndex]?.name || '';
@@ -958,7 +978,6 @@
       showView('upload');
     });
 
-    // Global error toast (visible from any view)
     const errorToast = document.getElementById('error-toast');
     function showToast(msg) {
       errorToast.textContent = msg;
@@ -966,14 +985,12 @@
       setTimeout(() => errorToast.classList.remove('show'), 5000);
     }
 
-    // Generate more terms
     btnGenerateMore.addEventListener('click', async () => {
       if (!lastExtractedText) { showToast('No PDF text available. Add a PDF first.'); return; }
       const cards = getActiveCards();
       const existingTerms = cards.map(c => c.term);
       const savedDeckIndex = activeDeckIndex;
       showView('loading');
-
       try {
         const words = lastExtractedText.split(/\s+/).slice(0, 6000).join(' ');
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -1000,14 +1017,10 @@
         } catch (parseErr) {
           throw new Error('Failed to parse response from Groq. Raw: ' + raw.substring(0, 200));
         }
-
         if (Array.isArray(newCards) && newCards.length > 0) {
-          // Filter out duplicates (case-insensitive match against existing terms)
           const existingLower = existingTerms.map(t => t.toLowerCase());
           const unique = newCards.filter(c => !existingLower.includes(c.term.toLowerCase()));
-          if (unique.length === 0) {
-            throw new Error('All generated terms already exist in this deck.');
-          }
+          if (unique.length === 0) throw new Error('All generated terms already exist in this deck.');
           const jumpTo = decks[savedDeckIndex].cards.length;
           decks[savedDeckIndex].cards.push(...unique);
           await saveDecks();
@@ -1022,10 +1035,8 @@
       }
     });
 
-    // Manual add card
     btnAddCard.addEventListener('click', () => {
-      manualTerm.value = '';
-      manualDef.value = '';
+      manualTerm.value = ''; manualDef.value = '';
       modalOverlay.classList.add('active');
       manualTerm.focus();
     });
@@ -1044,7 +1055,6 @@
     });
     manualDef.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); modalSave.click(); } });
 
-    // Keyboard nav
     document.addEventListener('keydown', e => {
       if (modalOverlay.classList.contains('active')) { if (e.key === 'Escape') closeModal(); return; }
       if (!cardsSection.classList.contains('active')) return;
@@ -1054,7 +1064,6 @@
       if (e.key === ' ') { e.preventDefault(); flashcard.classList.toggle('flipped'); }
     });
 
-    // Boot
     tryRestoreSession();
   </script>
 </body>
