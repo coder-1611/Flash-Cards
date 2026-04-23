@@ -744,16 +744,17 @@
     function friendlyGroqError(rawMsg) {
       if (isRateLimit(rawMsg)) {
         const secs = parseRetrySeconds(rawMsg);
+        const tip = 'Tip: uploading fewer PDFs at once can help avoid this.';
         return secs
-          ? `Too many documents for right now. Try again in ${secs} second${secs !== 1 ? 's' : ''}, or use fewer PDFs to reduce the load.`
-          : `Too many documents for right now. Please wait a moment and try again, or use fewer PDFs.`;
+          ? `Too many documents for right now. Try again in ${secs} second${secs !== 1 ? 's' : ''}. ${tip}`
+          : `Too many documents for right now. Please wait a moment and try again. ${tip}`;
       }
       return rawMsg;
     }
 
     // ── Groq API ──
     async function callGroq(text) {
-      const words = text.split(/\s+/).slice(0, 4000).join(' ');
+      const words = text.split(/\s+/).slice(0, 6000).join(' ');
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getGroqKey()}` },
@@ -949,7 +950,7 @@
       const savedPages = lastExtractedPages.slice();
       showView('loading');
       try {
-        const words = lastExtractedText.split(/\s+/).slice(0, 4000).join(' ');
+        const words = lastExtractedText.split(/\s+/).slice(0, 6000).join(' ');
         const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${getGroqKey()}` },
